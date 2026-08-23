@@ -1,0 +1,28 @@
+{
+  "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+  "name": "Headway Development",
+  "dockerComposeFile": "../compose.yaml",
+  "service": "app",
+  "runServices": ["app"],
+  "workspaceFolder": "/app",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/node:1": {}
+  },
+  "postCreateCommand": {
+    "sync-env": "uv sync --frozen --all-groups",
+    "install-codex": "npm install -g @openai/codex@latest"
+  },
+  "mounts": [
+    "source=headway-codex,target=/root/.codex,type=volume"
+  ],
+  "customizations": {
+    "jetbrains": {
+      "backend": "PyCharm",
+      "plugins": [
+        "com.intellij.ml.llm"
+      ]
+    }
+  },
+  "shutdownAction": "stopCompose"
+}

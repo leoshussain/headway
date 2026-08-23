@@ -1,0 +1,18 @@
+services:
+  app:
+    build:
+      context: .
+    init: true
+    volumes:
+      - .:/app
+    # Keep the development container available for `docker compose exec`.
+    command: ["sleep", "infinity"]
+
+  collector:
+    build:
+      context: .
+    init: true
+    volumes:
+      - .:/app
+    command: ["headway-collect"]
+    restart: unless-stopped

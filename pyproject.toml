@@ -1,0 +1,38 @@
+[project]
+name = "headway"
+version = "0.1.0"
+description = "Tools for collecting and analyzing public-transit reliability data"
+requires-python = ">=3.13"
+dependencies = [
+    "gtfs-realtime-bindings==2.2.0",
+    "httpx==0.28.1",
+    "polars==1.43.2",
+    "protobuf==7.36.0",
+    "pydantic==2.13.4",
+    "pydantic-settings[yaml]==2.15.0",
+    "python-dotenv>=1.2.3",
+]
+
+[tool.pyrefly]
+project-includes = [
+    "**/*.py*",
+    "**/*.ipynb",
+]
+
+[project.scripts]
+headway-collect = "headway.realtime.__main__:cli"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.3.0",
+    "pyrefly>=1.2.0",
+    "pytest>=8.4.2",
+    "pytest-asyncio>=1.2.0",
+    "requests>=2.34.2",
+    "ruff>=0.16.4",
+    "types-protobuf>=7.35.1.20260822",
+]
