@@ -3,18 +3,28 @@
   "name": "Headway Development",
   "dockerComposeFile": "../compose.yaml",
   "service": "app",
-  "runServices": ["app"],
+  "runServices": [
+    "app"
+  ],
   "workspaceFolder": "/app",
+  "containerEnv": {
+    "PYCHARM_PYTHON_PATH": "/opt/venv/bin/python"
+  },
   "features": {
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/node:1": {}
+    "ghcr.io/devcontainers/features/node:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
   },
   "postCreateCommand": {
     "sync-env": "uv sync --frozen --all-groups",
-    "install-codex": "npm install -g @openai/codex@latest"
+    "install-ai-clis": "npm install -g @openai/codex@latest opencode-ai@latest"
   },
   "mounts": [
-    "source=headway-codex,target=/root/.codex,type=volume"
+    "source=headway-codex,target=/root/.codex,type=volume",
+    "source=headway-user-config,target=/root/.config,type=volume",
+    "source=headway-user-data,target=/root/.local/share,type=volume",
+    "source=headway-jetbrains-cache,target=/root/.cache/JetBrains,type=volume",
+    "source=headway-jetbrains-data,target=/root/.local/share/JetBrains,type=volume"
   ],
   "customizations": {
     "jetbrains": {

@@ -9,8 +9,9 @@
       <excludeFolder url="file://$MODULE_DIR$/config" />
       <excludeFolder url="file://$MODULE_DIR$/data" />
       <excludeFolder url="file://$MODULE_DIR$/dist" />
+      <excludeFolder url="file://$MODULE_DIR$/.env" />
     </content>
-    <orderEntry type="jdk" jdkName="~\Documents\Concordia\Personal Projects\headway\.venv" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="/opt/venv (2)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
 </module>

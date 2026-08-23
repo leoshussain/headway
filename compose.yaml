@@ -11,8 +11,14 @@ services:
   collector:
     build:
       context: .
+    profiles: ["collection"]
     init: true
     volumes:
-      - .:/app
+      - .:/app:ro
+      - ./data:/app/data
     command: ["headway-collect"]
     restart: unless-stopped
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
