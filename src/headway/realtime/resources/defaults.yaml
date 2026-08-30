@@ -1,0 +1,15 @@
+data_dir: data
+
+feeds:
+  stm_trip_updates:
+    provider: stm
+    url: https://api.stm.info/pub/od/gtfs-rt/ic/v2/tripUpdates
+    poll_interval_seconds: 30
+  stm_vehicle_positions:
+    provider: stm
+    url: https://api.stm.info/pub/od/gtfs-rt/ic/v2/vehiclePositions
+    poll_interval_seconds: 30
+#  stm_service:
+#    provider: stm
+#    url: https://api.stm.info/pub/od/i3/v2/messages/etatService
+#    poll_interval_seconds: 30
