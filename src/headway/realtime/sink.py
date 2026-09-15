@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from google.transit.gtfs_realtime_pb2 import FeedHeader
 
@@ -34,7 +35,10 @@ class FileSink:
         artifact_ts = header.timestamp
         feed_path = self.make_path(self.root_dir, feed_info, artifact_ts, fetch_ts)
 
-        with feed_path.open("wb") as f:
-            f.write(payload)
+        with TemporaryDirectory(dir=feed_path.parent, prefix=".snapshot-") as temp_dir:
+            temp_path = Path(temp_dir) / "payload.tmp"
+            with temp_path.open("wb") as f:
+                f.write(payload)
+            temp_path.replace(feed_path)
 
         return feed_path

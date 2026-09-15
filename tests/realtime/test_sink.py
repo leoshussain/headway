@@ -76,20 +76,25 @@ def test_failed_write_leaves_no_complete_looking_snapshot(
     original_open = Path.open
 
     class FailingFile:
+        def __init__(self, path: Path) -> None:
+            self.file = original_open(path, "wb")
+
         def __enter__(self) -> Self:
             return self
 
         def __exit__(self, *_args: object) -> None:
-            return None
+            self.file.close()
 
-        def write(self, _payload: bytes) -> None:
+        def write(self, payload: bytes) -> None:
+            self.file.write(payload[:2])
+            self.file.flush()
             raise OSError("disk full")
 
     def failing_open(
         path: Path, mode: str = "r", *args: object, **kwargs: object
     ) -> object:
         if "w" in mode:
-            return FailingFile()
+            return FailingFile(path)
         return original_open(path, mode)
 
     monkeypatch.setattr(Path, "open", failing_open)
@@ -98,3 +103,24 @@ def test_failed_write_leaves_no_complete_looking_snapshot(
         FileSink(tmp_path).write(feed_info, feed_message.header, b"payload")
 
     assert not list(tmp_path.rglob("*.pb"))
+    assert not list(tmp_path.rglob(".snapshot-*"))
+
+
+def test_failed_rename_cleans_up_temporary_snapshot(
+    tmp_path: Path,
+    feed_info: FeedInfo,
+    feed_message: FeedMessage,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def failing_replace(path: Path, target: Path) -> Path:
+        assert path.read_bytes() == b"payload"
+        assert not target.exists()
+        raise OSError("rename failed")
+
+    monkeypatch.setattr(Path, "replace", failing_replace)
+
+    with pytest.raises(OSError, match="rename failed"):
+        FileSink(tmp_path).write(feed_info, feed_message.header, b"payload")
+
+    assert not list(tmp_path.rglob("*.pb"))
+    assert not list(tmp_path.rglob(".snapshot-*"))
