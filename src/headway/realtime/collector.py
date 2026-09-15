@@ -77,6 +77,11 @@ class RealtimeCollector:
     def decode(payload: bytes) -> FeedMessage:
         message: FeedMessage = FeedMessage()
         message.ParseFromString(payload)
+
+        if not message.IsInitialized():
+            missing = ",".join(message.FindInitializationErrors())
+            raise DecodeError(f"Missing required portobuf fields: {missing}")
+
         return message
 
     async def collect_once(

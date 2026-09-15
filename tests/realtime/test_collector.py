@@ -6,6 +6,7 @@ from unittest.mock import Mock
 import httpx
 import pytest
 from google.protobuf.message import DecodeError
+from google.transit.gtfs_realtime_pb2 import FeedMessage
 
 from headway.realtime.collector import RealtimeCollector
 from headway.realtime.models import FeedInfo
@@ -24,6 +25,45 @@ def test_decode_valid_fixture(protobuf_payload: bytes) -> None:
 def test_decode_rejects_malformed_payload() -> None:
     with pytest.raises(DecodeError):
         RealtimeCollector.decode(b"not a protobuf")
+
+
+@pytest.mark.parametrize(
+    ("message", "missing_field"),
+    [
+        pytest.param(FeedMessage(), "header", id="missing-header"),
+        pytest.param(
+            FeedMessage(header={}),
+            "header.gtfs_realtime_version",
+            id="missing-version",
+        ),
+        pytest.param(
+            FeedMessage(header={"gtfs_realtime_version": "2.0"}, entity=[{}]),
+            "entity[0].id",
+            id="missing-entity-id",
+        ),
+    ],
+)
+def test_decode_rejects_missing_required_fields(
+    message: FeedMessage, missing_field: str
+) -> None:
+    # Partial serialization deliberately creates parseable, incomplete protobufs.
+    payload = message.SerializePartialToString()
+
+    with pytest.raises(DecodeError) as exc_info:
+        RealtimeCollector.decode(payload)
+
+    assert missing_field in str(exc_info.value)
+
+
+def test_decode_accepts_complete_header_without_entities() -> None:
+    original = FeedMessage(
+        header={"gtfs_realtime_version": "2.0", "timestamp": 1_700_000_000}
+    )
+
+    message = RealtimeCollector.decode(original.SerializeToString())
+
+    assert message == original
+    assert len(message.entity) == 0
 
 
 @pytest.mark.asyncio
@@ -92,19 +132,42 @@ async def test_collect_once_does_not_retry_non_retryable_http_failure(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("status_code", "payload"),
+    [
+        pytest.param(200, b"not a protobuf", id="malformed"),
+        pytest.param(200, b"", id="empty-200"),
+        pytest.param(204, b"", id="empty-204"),
+        pytest.param(
+            200,
+            FeedMessage(header={}).SerializePartialToString(),
+            id="missing-version",
+        ),
+    ],
+)
 async def test_collect_once_propagates_decode_failure(
     tmp_path: Path,
     feed_info: FeedInfo,
+    status_code: int,
+    payload: bytes,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
-    def handle(request: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, content=b"not a protobuf", request=request)
+    requests = 0
 
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(status_code, content=payload, request=request)
+
+    caplog.set_level(logging.INFO, logger="headway.realtime.collector")
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
         collector = RealtimeCollector(client, FileSink(tmp_path))
         with pytest.raises(DecodeError):
             await collector.collect_once(feed_info)
 
+    assert requests == 1
     assert not list(tmp_path.rglob("*.pb"))
+    assert "Collection successful" not in caplog.text
 
 
 @pytest.mark.asyncio
