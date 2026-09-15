@@ -20,7 +20,8 @@ async def test_run_rejects_empty_feed_selection(
 
 
 @pytest.mark.asyncio
-async def test_run_rejects_mixed_provider_authentication_before_polling(
+async def test_run_polls_each_feed_with_its_provider_credentials(
+    monkeypatch: pytest.MonkeyPatch,
     config_factory: Callable[..., RealtimeConfig],
 ) -> None:
     providers = {
@@ -40,10 +41,24 @@ async def test_run_rejects_mixed_provider_authentication_before_polling(
         },
     }
     config = config_factory(providers=providers, feeds=feeds)
+    observed: dict[str, tuple[str, str]] = {}
 
-    with pytest.raises(ValueError, match="provider|authentication"):
-        async with asyncio.timeout(0.1):
-            await entrypoint.run(config, ["feed-a", "feed-b"])
+    async def poll_feed(
+        _self: object,
+        feed_info: FeedInfo,
+        *,
+        headers: dict[str, str],
+        **_kwargs: object,
+    ) -> None:
+        observed[feed_info.name] = feed_info.provider, headers["apiKey"]
+
+    monkeypatch.setattr(entrypoint.RealtimeCollector, "poll_feed", poll_feed)
+
+    await entrypoint.run(config, ["feed-a", "feed-b"])
+    assert observed == {
+        "feed-a": ("provider-a", "secret-a"),
+        "feed-b": ("provider-b", "secret-b"),
+    }
 
 
 @pytest.mark.asyncio
@@ -81,7 +96,7 @@ async def test_independent_feed_task_survives_another_task_failure(
     config = config_factory(feeds=feeds)
     healthy_completed = asyncio.Event()
 
-    async def poll_feed(_self: object, feed_info: FeedInfo) -> None:
+    async def poll_feed(_self: object, feed_info: FeedInfo, **_kwargs: object) -> None:
         if feed_info.name == "failing":
             await asyncio.sleep(0)
             raise RuntimeError("unexpected failure")

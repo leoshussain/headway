@@ -40,10 +40,12 @@ async def test_collect_once_fetches_and_preserves_exact_payload(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
         path = await RealtimeCollector(client, FileSink(tmp_path)).collect_once(
-            feed_info
+            feed_info,
+            headers={"apiKey": "test-key"},
         )
 
     assert [str(request.url) for request in requests] == [feed_info.url]
+    assert requests[0].headers["apiKey"] == "test-key"
     assert path.read_bytes() == protobuf_payload
 
 
@@ -52,7 +54,11 @@ async def test_collect_once_propagates_http_failure(
     tmp_path: Path,
     feed_info: FeedInfo,
 ) -> None:
+    requests = 0
+
     def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
         return httpx.Response(503, request=request)
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
@@ -60,6 +66,28 @@ async def test_collect_once_propagates_http_failure(
         with pytest.raises(httpx.HTTPStatusError):
             await collector.collect_once(feed_info)
 
+    assert requests == 3
+    assert not list(tmp_path.rglob("*.pb"))
+
+
+@pytest.mark.asyncio
+async def test_collect_once_does_not_retry_non_retryable_http_failure(
+    tmp_path: Path,
+    feed_info: FeedInfo,
+) -> None:
+    requests = 0
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(401, request=request)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handle)) as client:
+        collector = RealtimeCollector(client, FileSink(tmp_path))
+        with pytest.raises(httpx.HTTPStatusError):
+            await collector.collect_once(feed_info)
+
+    assert requests == 1
     assert not list(tmp_path.rglob("*.pb"))
 
 
@@ -80,14 +108,14 @@ async def test_collect_once_propagates_decode_failure(
 
 
 @pytest.mark.asyncio
-async def test_poll_feed_retries_expected_failure_without_real_sleep(
+async def test_poll_feed_continues_after_expected_failure_without_real_sleep(
     monkeypatch: pytest.MonkeyPatch,
     feed_info: FeedInfo,
 ) -> None:
     collector = RealtimeCollector(Mock(), Mock())
     attempts = 0
 
-    async def collect_once(_feed_info: FeedInfo) -> Path:
+    async def collect_once(_feed_info: FeedInfo, **_kwargs: object) -> Path:
         nonlocal attempts
         attempts += 1
         if attempts == 1:
@@ -118,7 +146,7 @@ async def test_poll_feed_cancellation_does_not_start_another_poll(
     collector = RealtimeCollector(Mock(), Mock())
     attempts = 0
 
-    async def collect_once(_feed_info: FeedInfo) -> Path:
+    async def collect_once(_feed_info: FeedInfo, **_kwargs: object) -> Path:
         nonlocal attempts
         attempts += 1
         raise asyncio.CancelledError
@@ -131,6 +159,26 @@ async def test_poll_feed_cancellation_does_not_start_another_poll(
         await collector.poll_feed(feed_info)
 
     assert attempts == 1
+    sleep.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_poll_feed_propagates_unexpected_failure(
+    monkeypatch: pytest.MonkeyPatch,
+    feed_info: FeedInfo,
+) -> None:
+    collector = RealtimeCollector(Mock(), Mock())
+
+    async def collect_once(_feed_info: FeedInfo, **_kwargs: object) -> Path:
+        raise RuntimeError("programming defect")
+
+    sleep = Mock()
+    monkeypatch.setattr(collector, "collect_once", collect_once)
+    monkeypatch.setattr(asyncio, "sleep", sleep)
+
+    with pytest.raises(RuntimeError, match="programming defect"):
+        await collector.poll_feed(feed_info)
+
     sleep.assert_not_called()
 
 
@@ -180,7 +228,7 @@ async def test_failure_log_identifies_feed_and_error_category(
 ) -> None:
     collector = RealtimeCollector(Mock(), Mock())
 
-    async def collect_once(_feed_info: FeedInfo) -> Path:
+    async def collect_once(_feed_info: FeedInfo, **_kwargs: object) -> Path:
         raise error
 
     async def stop_after_failure(_delay: float) -> None:

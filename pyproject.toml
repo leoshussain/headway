@@ -11,6 +11,7 @@ dependencies = [
     "pydantic==2.13.4",
     "pydantic-settings[yaml]==2.15.0",
     "python-dotenv>=1.2.3",
+    "tenacity==9.1.4",
 ]
 
 [tool.pyrefly]

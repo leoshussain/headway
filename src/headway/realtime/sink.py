@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from google.transit.gtfs_realtime_pb2 import FeedHeader
@@ -13,7 +14,8 @@ class FileSink:
     def make_path(
         root_dir: Path,
         feed_info: FeedInfo,
-        header: FeedHeader,
+        artifact_ts: float,
+        fetch_ts: float,
         suffix: str = ".pb",
     ) -> Path:
         path: Path = (
@@ -22,14 +24,15 @@ class FileSink:
             / "raw"
             / feed_info.provider
             / feed_info.name
-            / str(header.timestamp)
+            / f"{fetch_ts}_{artifact_ts}{suffix}"
         )
-        path = path.with_suffix(suffix)
         path.parent.mkdir(parents=True, exist_ok=True)
         return path
 
     def write(self, feed_info: FeedInfo, header: FeedHeader, payload: bytes) -> Path:
-        feed_path = self.make_path(self.root_dir, feed_info, header)
+        fetch_ts = datetime.now(tz=UTC).timestamp()
+        artifact_ts = header.timestamp
+        feed_path = self.make_path(self.root_dir, feed_info, artifact_ts, fetch_ts)
 
         with feed_path.open("wb") as f:
             f.write(payload)

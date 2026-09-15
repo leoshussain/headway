@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 from google.transit.gtfs_realtime_pb2 import FeedMessage
 from pydantic import SecretStr
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource
 
 from headway.realtime.config import RealtimeConfig
 from headway.realtime.models import FeedInfo
@@ -35,11 +36,23 @@ def feed_message(protobuf_payload: bytes) -> FeedMessage:
     return message
 
 
+class TestRealtimeConfig(RealtimeConfig):
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return (init_settings,)
+
+
 @pytest.fixture
 def config_factory(tmp_path: Path) -> ConfigFactory:
-    from headway.realtime.config import RealtimeConfig
 
-    def make_config(**overrides: Any) -> RealtimeConfig:
+    def make_config(**overrides: Any) -> TestRealtimeConfig:
         values: dict[str, Any] = {
             "data_dir": tmp_path,
             "providers": {"test-provider": {"api_key": "test-secret"}},
@@ -52,6 +65,6 @@ def config_factory(tmp_path: Path) -> ConfigFactory:
             },
         }
         values.update(overrides)
-        return RealtimeConfig(**values)
+        return TestRealtimeConfig(**values)
 
     return make_config
