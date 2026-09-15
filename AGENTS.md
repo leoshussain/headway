@@ -2,7 +2,7 @@
 
 ## Setup and checks
 
-- Use Python 3.13 and `uv`; install the locked project plus all development groups with `uv sync --frozen --all-groups`.
+- Use Python 3.14.6 and `uv`; install the locked project plus all development groups with `uv sync --frozen --all-groups`.
 - Run tests with `uv run pytest`; target one test with `uv run pytest tests/path/to/test_file.py::test_name`.
 - Run lint, formatting, and type checks with `uv run ruff check .`, `uv run ruff format --check .`, and `uv run pyrefly check`.
 - Ruff and Pyrefly have no exclusions configured: full-repository checks inspect the prototype notebook, and Ruff also formats Python examples in Markdown. Use a changed-file scope for focused verification, but do not treat that as a replacement for reporting full-check failures.
